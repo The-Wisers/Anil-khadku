@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -122,4 +123,30 @@ body {
 
 .animate-shake {
   animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+}
+
+/* Explosion animation */
+@keyframes explode {
+  0% {
+    width: 10px;
+    height: 10px;
+    background-color: hsl(var(--accent)); /* Orange */
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(0.5);
+  }
+  50% {
+    background-color: hsl(var(--primary)); /* Red */
+    opacity: 0.7;
+  }
+  100% {
+    width: 100px; /* Final size of explosion */
+    height: 100px;
+    background-color: hsl(var(--destructive)); /* Darker Red */
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.5);
+  }
+}
+
+.animate-explode {
+  animation: explode 0.5s forwards;
 }
