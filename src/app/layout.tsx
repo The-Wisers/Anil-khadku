@@ -1,17 +1,13 @@
+
 import type {Metadata} from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
+import { Inter } from 'next/font/google'; // Using Inter as a more common default
 import { Anton } from 'next/font/google';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 
-const geistSans = Geist({
-  variable: '--font-geist-sans',
+const inter = Inter({
   subsets: ['latin'],
-});
-
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
-  subsets: ['latin'],
+  variable: '--font-sans', // Changed from geist to inter
 });
 
 const anton = Anton({
@@ -32,7 +28,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} ${anton.variable} antialiased font-sans`}>
+      <body className={`${inter.variable} ${anton.variable} antialiased font-sans`}>
         {children}
         <Toaster />
       </body>
