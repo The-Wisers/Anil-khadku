@@ -11,15 +11,16 @@ const GRAVITY = 0.6;
 const FRICTION = 0.99; // Air friction
 const GROUND_FRICTION = 0.9;
 const RESTITUTION = 0.6; // Bounciness
-const THROW_MULTIPLIER = 0.35;
-const STICKMAN_WIDTH = 48; // Approximate width for collision
-const STICKMAN_HEIGHT = 72; // Approximate height for collision
+const THROW_VELOCITY_MULTIPLIER = 1.5; // Adjusted for new velocity calculation
+const STICKMAN_WIDTH = 48; 
+const STICKMAN_HEIGHT = 72; 
 const CLICK_IMPULSE_STRENGTH = 15;
+const TARGET_FRAME_TIME_S = 1 / 60; // Assuming 60 FPS for physics scaling
 
 export function GameArea() {
   const [stickmanState, setStickmanState] = useState<StickmanState>({
-    x: 200, // Initial center X
-    y: 100, // Initial center Y
+    x: 200, 
+    y: 100, 
     vx: 0,
     vy: 0,
     rotation: 0,
@@ -28,7 +29,10 @@ export function GameArea() {
   });
   const gameAreaRef = useRef<HTMLDivElement>(null);
   const dragStartOffsetRef = useRef<{ offsetX: number; offsetY: number } | null>(null);
-  const lastMousePositionRef = useRef<{ x: number; y: number } | null>(null);
+  // Store last two points with timestamps for velocity calculation
+  const lastMousePositionRef = useRef<{ x: number; y: number; timestamp: number } | null>(null);
+  const previousMousePositionRef = useRef<{ x: number; y: number; timestamp: number } | null>(null);
+  
   const animationFrameIdRef = useRef<number | null>(null);
   const { toast } = useToast();
 
@@ -37,34 +41,28 @@ export function GameArea() {
 
     setStickmanState(prev => {
       if (prev.isBeingDragged) {
-        return prev; // Physics doesn't apply while dragging
+        return prev; 
       }
 
-      let { x, y, vx, vy, rotation, isHit } = prev;
+      let { x, y, vx, vy, rotation } = prev; // isHit is handled by interaction
       const gameAreaRect = gameAreaRef.current!.getBoundingClientRect();
       
-      // Apply gravity
       vy += GRAVITY;
-
-      // Apply air friction
       vx *= FRICTION;
       vy *= FRICTION;
 
-      // Update position
       x += vx;
       y += vy;
 
-      // Collision with floor (bottom boundary)
       const floorY = gameAreaRect.height - STICKMAN_HEIGHT / 2;
       if (y >= floorY) {
         y = floorY;
-        vy *= -RESTITUTION; // Bounce
-        vx *= GROUND_FRICTION; // Friction with ground
-        if (Math.abs(vy) < 1) vy = 0; // Come to rest
-         if (Math.abs(vx) < 0.1) vx = 0;
+        vy *= -RESTITUTION; 
+        vx *= GROUND_FRICTION; 
+        if (Math.abs(vy) < 1) vy = 0; 
+        if (Math.abs(vx) < 0.1) vx = 0;
       }
 
-      // Collision with walls (left/right boundaries)
       const leftWallX = STICKMAN_WIDTH / 2;
       const rightWallX = gameAreaRect.width - STICKMAN_WIDTH / 2;
       if (x <= leftWallX) {
@@ -75,19 +73,17 @@ export function GameArea() {
         vx *= -RESTITUTION;
       }
       
-      // Collision with ceiling (top boundary)
       const ceilingY = STICKMAN_HEIGHT / 2;
       if (y <= ceilingY) {
         y = ceilingY;
         vy *= -RESTITUTION;
       }
 
-      // Update rotation based on horizontal velocity (simple effect)
       if(Math.abs(vx) > 0.1 || Math.abs(vy) > 0.1) {
          rotation = (rotation + vx * 0.5) % 360;
       }
       
-      return { ...prev, x, y, vx, vy, rotation, isHit };
+      return { ...prev, x, y, vx, vy, rotation }; // Removed isHit from here, it's event-driven
     });
 
     animationFrameIdRef.current = requestAnimationFrame(gameLoop);
@@ -110,96 +106,110 @@ export function GameArea() {
     const clientX = e.clientX;
     const clientY = e.clientY;
     const gameAreaRect = gameAreaRef.current.getBoundingClientRect();
-
-    // Calculate offset from click point to stickman's current center
     const clickXInGameArea = clientX - gameAreaRect.left;
     const clickYInGameArea = clientY - gameAreaRect.top;
-    
-    dragStartOffsetRef.current = {
-      offsetX: clickXInGameArea - stickmanState.x,
-      offsetY: clickYInGameArea - stickmanState.y,
-    };
-    lastMousePositionRef.current = { x: clientX, y: clientY };
 
-    setStickmanState(prev => ({ 
-      ...prev, 
-      isBeingDragged: true, 
-      isHit: false, 
-      vx: 0, // Stop physics movement while dragging
-      vy: 0 
-    }));
+    setStickmanState(prev => {
+      dragStartOffsetRef.current = {
+        offsetX: clickXInGameArea - prev.x,
+        offsetY: clickYInGameArea - prev.y,
+      };
+      const now = Date.now();
+      lastMousePositionRef.current = { x: clientX, y: clientY, timestamp: now };
+      previousMousePositionRef.current = { x: clientX, y: clientY, timestamp: now }; // Initialize previous to current
+
+      return { 
+        ...prev, 
+        isBeingDragged: true, 
+        isHit: false, 
+        vx: 0, 
+        vy: 0 
+      };
+    });
   };
 
-  const handleMouseMove = useCallback((e: MouseEvent | TouchEvent) => {
-    if (!stickmanState.isBeingDragged || !gameAreaRef.current || !dragStartOffsetRef.current) {
-      return;
-    }
-    
-    // Capture the values from dragStartOffsetRef.current NOW, while it's guaranteed to be non-null
+  const handleMouseMove = useCallback((event: MouseEvent | TouchEvent) => {
+    if (!gameAreaRef.current || !dragStartOffsetRef.current) return;
+
+    // These are captured at the start of the event, stable for this handler invocation
     const currentDragOffsetX = dragStartOffsetRef.current.offsetX;
     const currentDragOffsetY = dragStartOffsetRef.current.offsetY;
 
-    const clientX = (e as MouseEvent).clientX ?? (e as TouchEvent).touches?.[0]?.clientX ?? 0;
-    const clientY = (e as MouseEvent).clientY ?? (e as TouchEvent).touches?.[0]?.clientY ?? 0;
+    const clientX = (event instanceof MouseEvent) ? event.clientX : event.touches[0].clientX;
+    const clientY = (event instanceof MouseEvent) ? event.clientY : event.touches[0].clientY;
+    
+    // Update previous mouse position before updating the last one
+    if (lastMousePositionRef.current) {
+      previousMousePositionRef.current = { ...lastMousePositionRef.current };
+    }
+    lastMousePositionRef.current = { x: clientX, y: clientY, timestamp: Date.now() };
     
     const gameAreaRect = gameAreaRef.current.getBoundingClientRect();
-    
     const mouseXInGameArea = clientX - gameAreaRect.left;
     const mouseYInGameArea = clientY - gameAreaRect.top;
 
-    setStickmanState(prev => ({
-      ...prev,
-      x: mouseXInGameArea - currentDragOffsetX, // Use captured value
-      y: mouseYInGameArea - currentDragOffsetY, // Use captured value
-    }));
-    lastMousePositionRef.current = { x: clientX, y: clientY };
-  }, [stickmanState.isBeingDragged]);
+    setStickmanState(prev => {
+      // Only update position if dragging is still active according to the latest state
+      if (!prev.isBeingDragged) return prev; 
+      
+      return {
+        ...prev,
+        x: mouseXInGameArea - currentDragOffsetX,
+        y: mouseYInGameArea - currentDragOffsetY,
+      };
+    });
+  }, []); // Empty deps: setStickmanState is stable, refs are stable
 
   const handleMouseUp = useCallback(() => {
-    if (stickmanState.isBeingDragged && lastMousePositionRef.current && dragStartOffsetRef.current) {
-      // For throw velocity, ideally track a few recent mouse moves.
-      // Simplified: use a fixed impulse or a very basic delta if needed.
-      // For now, let's use a simple mechanism: if mouse moved, apply some velocity.
-      // A more complex velocity calculation would be:
-      // const dx = clientX - (lastMousePositionRef.current.x || clientX);
-      // const dy = clientY - (lastMousePositionRef.current.y || clientY);
-      // This would require clientX/Y from the mouseup event, which isn't directly passed here.
-      // So we'll rely on the last recorded mouse move.
-      
-      // Calculate velocity based on overall drag displacement.
-      // This is a simplification. True throw velocity depends on the final flick.
-      // Let's use an average velocity from the drag if the drag was short,
-      // or a fixed "release" impulse for now for simplicity.
-      // A better approach would be to track mouse positions during mousemove and calculate velocity on mouseup.
+    setStickmanState(prev => {
+      if (!prev.isBeingDragged) return prev;
 
-      // Let's make the anil khadku thrown based on the last mouse direction
-      // if (lastMousePositionRef.current && dragStartOffsetRef.current) // Already checked by isBeingDragged
-      
-      // Use a fixed throw impulse for simplicity, can be enhanced later
-      // For a more dynamic throw, need to calculate velocity from last few mouse movements.
-      // Let's make it so that the object continues with the velocity it had during the drag.
-      // This requires continuously updating vx/vy during drag OR calculating on release.
+      let throwVx = 0;
+      let throwVy = 0;
 
-      // For now, a simple throw based on the last movement vector:
-      // This will be based on the *change* from initial drag point to release point.
-      // This logic for velocity is simple and might not feel like a "flick".
-      // Better: calculate based on last few mousemove events.
-      // For now, let's try a placeholder fixed impulse
-      const impulseX = (Math.random() - 0.5) * 20 * THROW_MULTIPLIER;
-      const impulseY = -Math.random() * 15 * THROW_MULTIPLIER; // Bias upwards slightly
+      if (lastMousePositionRef.current && previousMousePositionRef.current && 
+          previousMousePositionRef.current.timestamp < lastMousePositionRef.current.timestamp) {
+        
+        const dx = lastMousePositionRef.current.x - previousMousePositionRef.current.x;
+        const dy = lastMousePositionRef.current.y - previousMousePositionRef.current.y;
+        const dtSeconds = (lastMousePositionRef.current.timestamp - previousMousePositionRef.current.timestamp) / 1000;
+
+        if (dtSeconds > 0.001) { // Avoid division by zero or tiny dt
+          // Convert velocity (pixels/sec) to (pixels/frame)
+          const velocityScale = TARGET_FRAME_TIME_S * THROW_VELOCITY_MULTIPLIER;
+          throwVx = (dx / dtSeconds) * velocityScale;
+          throwVy = (dy / dtSeconds) * velocityScale;
+          
+          const maxThrowSpeed = 30; // Max speed in pixels/frame
+          throwVx = Math.max(-maxThrowSpeed, Math.min(maxThrowSpeed, throwVx));
+          throwVy = Math.max(-maxThrowSpeed, Math.min(maxThrowSpeed, throwVy));
+        } else {
+           // Fallback for very fast flicks or no movement
+           throwVx = (Math.random() - 0.5) * 5; 
+           throwVy = (Math.random() - 0.5) * 5 - 2; // Slight upward bias
+        }
+      } else {
+        // Fallback if not enough data (e.g. click release without much drag)
+        throwVx = (Math.random() - 0.5) * 3;
+        throwVy = (Math.random() - 0.5) * 3 -1;
+      }
       
-      setStickmanState(prev => ({ 
+      return { 
         ...prev, 
         isBeingDragged: false,
-        vx: prev.vx + impulseX, // add to existing vx from physics if any before drag
-        vy: prev.vy + impulseY,
-      }));
-    }
+        vx: throwVx, 
+        vy: throwVy,
+      };
+    });
+    
+    // Clear refs after state update is queued
     dragStartOffsetRef.current = null;
-    lastMousePositionRef.current = null; // Clear last mouse position
-  }, [stickmanState.isBeingDragged]);
+    lastMousePositionRef.current = null;
+    previousMousePositionRef.current = null;
+  }, [THROW_VELOCITY_MULTIPLIER]); // THROW_VELOCITY_MULTIPLIER is a const effectively
 
   useEffect(() => {
+    // handleMouseMove and handleMouseUp are stable due to their useCallback deps
     const moveListener = (e: MouseEvent | TouchEvent) => handleMouseMove(e);
     const upListener = () => handleMouseUp();
 
@@ -209,11 +219,14 @@ export function GameArea() {
       document.addEventListener('touchmove', moveListener, { passive: false });
       document.addEventListener('touchend', upListener);
     } else {
+      // Cleanup listeners when not dragging
       document.removeEventListener('mousemove', moveListener);
       document.removeEventListener('mouseup', upListener);
       document.removeEventListener('touchmove', moveListener);
       document.removeEventListener('touchend', upListener);
     }
+
+    // This return function is the cleanup for the useEffect hook
     return () => {
       document.removeEventListener('mousemove', moveListener);
       document.removeEventListener('mouseup', upListener);
@@ -222,7 +235,8 @@ export function GameArea() {
     };
   }, [stickmanState.isBeingDragged, handleMouseMove, handleMouseUp]);
 
-  const handleInteraction = () => { // Click interaction
+
+  const handleInteraction = () => { 
     if (stickmanState.isBeingDragged) return;
 
     toast({
@@ -231,13 +245,12 @@ export function GameArea() {
     });
 
     const hitAngle = Math.random() * Math.PI * 2;
-    const impulseStrength = CLICK_IMPULSE_STRENGTH;
     
     setStickmanState(prev => ({ 
       ...prev, 
       isHit: true, 
-      vx: prev.vx + Math.cos(hitAngle) * impulseStrength,
-      vy: prev.vy + Math.sin(hitAngle) * impulseStrength - 5, // slightly upward bias
+      vx: prev.vx + Math.cos(hitAngle) * CLICK_IMPULSE_STRENGTH,
+      vy: prev.vy + Math.sin(hitAngle) * CLICK_IMPULSE_STRENGTH - 5, 
       rotation: (prev.rotation + (Math.random() -0.5) * 90 ) % 360
     }));
     setTimeout(() => setStickmanState(prev => ({ ...prev, isHit: false })), 500); 
@@ -245,14 +258,14 @@ export function GameArea() {
   
   const handleTouchStart = (e: React.TouchEvent<SVGSVGElement>) => {
     if (e.touches.length === 1) {
-        e.preventDefault(); // Prevent page scroll/zoom
+        e.preventDefault(); 
         const touch = e.touches[0];
+        // Simulate a MouseEvent for handleMouseDown
         const pseudoMouseEvent = {
             clientX: touch.clientX,
             clientY: touch.clientY,
             preventDefault: () => e.preventDefault(),
-            nativeEvent: e.nativeEvent 
-        } as unknown as React.MouseEvent<SVGSVGElement>;
+        } as unknown as React.MouseEvent<SVGSVGElement>; // Cast needed for type compatibility
         handleMouseDown(pseudoMouseEvent);
     }
   };
@@ -262,14 +275,8 @@ export function GameArea() {
       ref={gameAreaRef} 
       className="h-full flex items-center justify-center relative overflow-hidden shadow-xl bg-muted/30 border-2 border-dashed border-accent/50 touch-none select-none"
       style={{ WebkitUserSelect: 'none', MozUserSelect: 'none', msUserSelect: 'none', userSelect: 'none' }}
-      onTouchStartCapture={(e) => { 
-        if (e.target === gameAreaRef.current || gameAreaRef.current?.contains(e.target as Node) ) {
-           // e.preventDefault(); // Could be too aggressive here, handle in AnilKhadku's onTouchStart
-        }
-      }}
     >
       <CardContent className="w-full h-full flex items-center justify-center p-0 relative">
-        {/* AnilKhadku is positioned absolutely by its own style prop now */}
         <AnilKhadku
           state={stickmanState}
           width={STICKMAN_WIDTH}
@@ -277,7 +284,7 @@ export function GameArea() {
           onMouseDown={handleMouseDown}
           onClick={handleInteraction} 
           onTouchStart={handleTouchStart}
-          style={{ willChange: 'transform, top, left' }} // Performance hint
+          style={{ willChange: 'transform, top, left' }}
         />
       </CardContent>
        <div className="absolute top-2 left-1/2 -translate-x-1/2 text-muted-foreground text-sm p-2 bg-background/80 rounded-md select-none pointer-events-none">
@@ -286,3 +293,4 @@ export function GameArea() {
     </Card>
   );
 }
+
