@@ -3,36 +3,47 @@
 @tailwind utilities;
 
 body {
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; /* A common, clean, slightly blocky sans-serif */
 }
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
+    --background: 0 0% 93%; /* #EEEEEE Light Gray */
+    --foreground: 0 0% 20%; /* Dark Gray for text on light background */
+
+    --card: 0 0% 100%; /* White cards */
+    --card-foreground: 0 0% 20%; /* Dark Gray text on cards */
+
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
-    --primary: 0 0% 9%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96.1%;
+    --popover-foreground: 0 0% 20%;
+
+    --primary: 6 82% 45%; /* #D42313 Intense Red */
+    --primary-foreground: 0 0% 100%; /* White */
+
+    --secondary: 0 0% 96.1%; /* Default ShadCN secondary, can adjust if needed */
     --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96.1%;
+
+    --muted: 0 0% 90%; /* Slightly darker gray for muted elements */
     --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
-    --accent-foreground: 0 0% 9%;
+
+    --accent: 39 100% 50%; /* #FFA500 Vibrant Orange */
+    --accent-foreground: 0 0% 0%; /* Black for text on orange */
+
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
+
+    --border: 0 0% 85%; /* Border color for elements on light gray */
+    --input: 0 0% 85%;
+    --ring: 6 82% 45%; /* Ring color to match primary */
+
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
+
+    /* Sidebar specific colors - can be harmonized if sidebar is used extensively */
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
     --sidebar-primary: 240 5.9% 10%;
@@ -42,31 +53,42 @@ body {
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
+
   .dark {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
+    /* For dark mode, we'll invert or use a darker theme.
+       The request doesn't specify dark mode, so these are less critical for now
+       but should be harmonious if implemented.
+       Using a dark background, light text, and keeping primary/accent vibrant.
+    */
+    --background: 0 0% 10%; /* Dark Gray */
+    --foreground: 0 0% 93%; /* Light Gray text */
+
+    --card: 0 0% 15%; /* Darker cards */
+    --card-foreground: 0 0% 93%;
+
+    --popover: 0 0% 15%;
+    --popover-foreground: 0 0% 93%;
+
+    --primary: 6 82% 50%; /* Keep Intense Red, maybe slightly brighter */
+    --primary-foreground: 0 0% 100%; /* White */
+
+    --secondary: 0 0% 20%;
+    --secondary-foreground: 0 0% 93%;
+
+    --muted: 0 0% 20%;
     --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
+
+    --accent: 39 100% 55%; /* Keep Vibrant Orange, maybe slightly brighter */
+    --accent-foreground: 0 0% 0%; /* Black */
+
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
+
+    --border: 0 0% 25%;
+    --input: 0 0% 25%;
+    --ring: 6 82% 50%; /* Ring color to match primary */
+
+    /* Sidebar dark theme adjustments */
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;
@@ -85,4 +107,19 @@ body {
   body {
     @apply bg-background text-foreground;
   }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-anton), Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif;
+    @apply font-bold;
+  }
+}
+
+/* Custom animation for stickman getting hit */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+  20%, 40%, 60%, 80% { transform: translateX(5px); }
+}
+
+.animate-shake {
+  animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
 }
