@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { SVGProps } from 'react';
@@ -23,9 +24,10 @@ export function AnilKhadku({ state, className, ...props }: AnilKhadkuProps) {
       }}
       {...props}
     >
-      <g stroke="var(--foreground)" strokeWidth="6" strokeLinecap="round">
-        {/* Head */}
-        <circle cx="0" cy="10" r="10" fill="hsl(var(--background))" />
+      {/* Stickman parts: made solid dark gray for visibility */}
+      <g fill="hsl(var(--foreground))" stroke="hsl(var(--foreground))" strokeWidth="6" strokeLinecap="round">
+        {/* Head - will inherit fill and stroke from parent g */}
+        <circle cx="0" cy="10" r="10" />
         {/* Body */}
         <line x1="0" y1="20" x2="0" y2="60" />
         {/* Arms */}
@@ -35,9 +37,9 @@ export function AnilKhadku({ state, className, ...props }: AnilKhadkuProps) {
         <line x1="0" y1="60" x2="-20" y2="90" />
         <line x1="0" y1="60" x2="20" y2="90" />
       </g>
-      {/* Example of a facial expression change on hit - very basic */}
+      {/* Facial expression change on hit */}
       {state.isHit && (
-        <g stroke="var(--primary)" fill="none" strokeWidth="1.5">
+        <g stroke="hsl(var(--primary))" fill="none" strokeWidth="1.5">
           <line x1="-3" y1="7" x2="-1" y2="9" />
           <line x1="-1" y1="7" x2="-3" y2="9" />
           <line x1="3" y1="7" x2="1" y2="9" />
