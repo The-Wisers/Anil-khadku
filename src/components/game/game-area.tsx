@@ -7,7 +7,7 @@ import { AnilKhadku } from './anil-khadku';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { Rocket, Crosshair, Target, Ban, Bomb } from 'lucide-react'; // Added Bomb for explosion placeholder
+import { Rocket, Crosshair, Target, Ban } from 'lucide-react'; // Bomb icon removed as explosion is CSS
 import { cn } from '@/lib/utils';
 
 const GRAVITY = 0.6;
@@ -62,9 +62,9 @@ export function GameArea() {
   const dragStartOffsetRef = useRef<{ offsetX: number; offsetY: number } | null>(null);
   const lastMousePositionRef = useRef<{ x: number; y: number; timestamp: number } | null>(null);
   const previousMousePositionRef = useRef<{ x: number; y: number; timestamp: number } | null>(null);
+  
   const stickmanStateRef = useRef(stickmanState);
-  const missileStateRef = useRef<MissileState | null>(null);
-
+  const missileStateRef = useRef<MissileState | null>(null); // Ref for missile state in game loop
 
   const animationFrameIdRef = useRef<number | null>(null);
   const { toast } = useToast();
@@ -83,13 +83,13 @@ export function GameArea() {
   }, [stickmanState]);
 
   useEffect(() => {
-    missileStateRef.current = missile;
+    missileStateRef.current = missile; // Keep ref in sync with state for game loop
   }, [missile]);
 
 
   const processMissileArrival = useCallback((arrivedMissile: MissileState) => {
-    setExplosion({ x: arrivedMissile.endX, y: arrivedMissile.endY, id: Date.now() });
-    setTimeout(() => setExplosion(null), 500); // Explosion CSS animation duration
+    setExplosion({ active: true, x: arrivedMissile.endX, y: arrivedMissile.endY, id: Date.now() });
+    setTimeout(() => setExplosion(null), 600); // Match explosion CSS animation duration slightly longer
 
     if (arrivedMissile.targetIsAnil) {
       toast({ title: "Anil Khadku", description: "Ah ah ahh!" });
@@ -107,11 +107,12 @@ export function GameArea() {
     } else {
       toast({ title: "Missed!", description: "The missile went wide.", variant: "destructive" });
     }
-    setMissile(null);
+    setMissile(null); // Clear missile state
   }, [toast]);
 
 
   const gameLoop = useCallback(() => {
+    // Missile movement logic
     if (missileStateRef.current && missileStateRef.current.active) {
       const currentMissile = missileStateRef.current;
       const dx = currentMissile.endX - currentMissile.currentX;
@@ -119,11 +120,12 @@ export function GameArea() {
       const distRemaining = Math.sqrt(dx * dx + dy * dy);
 
       if (distRemaining < MISSILE_SPEED) {
-        processMissileArrival(currentMissile);
+        processMissileArrival(currentMissile); // process arrival then setMissile(null)
       } else {
         const moveX = (dx / distRemaining) * MISSILE_SPEED;
         const moveY = (dy / distRemaining) * MISSILE_SPEED;
-        setMissile(prev => prev ? ({
+        // Update actual missile state for rendering
+        setMissile(prev => prev ? ({ 
           ...prev,
           currentX: prev.currentX + moveX,
           currentY: prev.currentY + moveY,
@@ -138,7 +140,7 @@ export function GameArea() {
     
     setStickmanState(prev => {
       if (prev.isBeingDragged) {
-        return prev; // Position updated by mouse move
+        return prev; 
       }
 
       let { x, y, vx, vy, rotation } = prev;
@@ -157,7 +159,7 @@ export function GameArea() {
         vy *= -RESTITUTION;
         vx *= GROUND_FRICTION;
         if (Math.abs(vy) < 1) vy = 0;
-        if (Math.abs(vx) < 0.1) vx = 0; // Stop micro-movements on ground
+        if (Math.abs(vx) < 0.1) vx = 0; 
       }
 
       const leftWallX = STICKMAN_WIDTH / 2;
@@ -176,17 +178,15 @@ export function GameArea() {
         vy *= -RESTITUTION;
       }
 
-
-      if(Math.abs(vx) > 0.1 || Math.abs(vy) > 0.1) { // Only rotate if moving significantly
-         rotation = (rotation + vx * 0.5) % 360; // Simple rotation based on horizontal velocity
+      if(Math.abs(vx) > 0.1 || Math.abs(vy) > 0.1) { 
+         rotation = (rotation + vx * 0.5) % 360; 
       }
-
 
       return { ...prev, x, y, vx, vy, rotation };
     });
 
     animationFrameIdRef.current = requestAnimationFrame(gameLoop);
-  }, [processMissileArrival]);
+  }, [processMissileArrival]); // gameLoop depends on processMissileArrival
 
 
   useEffect(() => {
@@ -201,9 +201,9 @@ export function GameArea() {
 
   const handleFireSequence = useCallback((start: {x: number, y: number}, end: {x: number, y: number}, directClickOnAnil: boolean) => {
     const selectedWeapon = availableWeapons.find(w => w.id === selectedWeaponId);
-    if (!selectedWeapon || !gameAreaRef.current) return;
+    if (!selectedWeapon || !gameAreaRef.current || missile?.active) return;
 
-    const currentStickmanPos = stickmanStateRef.current;
+    const currentStickmanPos = stickmanStateRef.current; // Use ref for latest position
     const stickmanRect = {
       left: currentStickmanPos.x - STICKMAN_WIDTH / 2,
       right: currentStickmanPos.x + STICKMAN_WIDTH / 2,
@@ -218,21 +218,17 @@ export function GameArea() {
     if (selectedWeapon.id === 'missile') {
         const dxAngle = end.x - start.x;
         const dyAngle = end.y - start.y;
-        // Calculate rotation. Rocket icon points up-left, so +135 degree might be a good start.
-        // Or more accurately: atan2 gives angle from positive x-axis. Rocket icon points up.
-        // If Rocket points straight up (0, -1 vector), angle should be atan2(dy, dx) - 90 deg (or +270).
         const angle = Math.atan2(dyAngle, dxAngle) * (180 / Math.PI);
-
 
         setMissile({
             active: true,
             startX: start.x, startY: start.y,
             currentX: start.x, currentY: start.y,
             endX: end.x, endY: end.y,
-            rotation: angle + 90, // Lucide Rocket points up, so add 90 to align with direction vector
+            rotation: angle + 90, 
             targetIsAnil: isTargetAnil,
         });
-    } else { // For other weapons (gun, bow) - instant hit/miss
+    } else { 
         if (isTargetAnil) {
             toast({
               title: `${selectedWeapon.name} Hit!`,
@@ -243,7 +239,7 @@ export function GameArea() {
             const impulseDy = end.y - start.y;
             const magnitude = Math.sqrt(impulseDx * impulseDx + impulseDy * impulseDy);
             const impulseVx = magnitude > 0 ? (impulseDx / magnitude) * WEAPON_IMPULSE_STRENGTH : (Math.random() - 0.5) * WEAPON_IMPULSE_STRENGTH;
-            const impulseVy = magnitude > 0 ? (impulseDy / magnitude) * WEAPON_IMPULSE_STRENGTH : (Math.random() - 0.5) * WEAPON_IMPULSE_STRENGTH - 5; // a bit upwards
+            const impulseVy = magnitude > 0 ? (impulseDy / magnitude) * WEAPON_IMPULSE_STRENGTH : (Math.random() - 0.5) * WEAPON_IMPULSE_STRENGTH - 5; 
 
             setStickmanState(prev => ({
               ...prev,
@@ -261,48 +257,46 @@ export function GameArea() {
             });
         }
     }
-  }, [selectedWeaponId, availableWeapons, toast, stickmanStateRef]);
+  }, [selectedWeaponId, availableWeapons, toast, missile?.active]); // stickmanStateRef is stable, no need to list
 
 
   const handleGameAreaMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    if (!selectedWeaponId || !gameAreaRef.current || missile?.active) return;
-    
+    if (!gameAreaRef.current || missile?.active) return;
+
     const targetIsAnilKhadku = (e.target as HTMLElement).closest('[data-id="AnilKhadkuSVG"]');
-    if (targetIsAnilKhadku) { // Clicked on Anil, fire immediately
-        const gameAreaRect = gameAreaRef.current.getBoundingClientRect();
-        const anilCenterX = stickmanStateRef.current.x;
-        const anilCenterY = stickmanStateRef.current.y;
-        // For direct fire, "start" can be arbitrary point away from Anil, or center of game area
-        const fireStartX = gameAreaRect.width / 2;
-        const fireStartY = gameAreaRect.height / 10; // From top-center
-        handleFireSequence({ x: fireStartX, y: fireStartY }, { x: anilCenterX, y: anilCenterY }, true);
+
+    if (targetIsAnilKhadku) {
+        // If the click is on Anil, do nothing in this handler.
+        // handleAnilKhadkuMouseDown will manage drag (if no weapon) or direct fire (if weapon selected).
         return;
     }
 
-    // Clicked on empty space, start aiming
-    const gameAreaRect = gameAreaRef.current.getBoundingClientRect();
-    const mouseX = e.clientX - gameAreaRect.left;
-    const mouseY = e.clientY - gameAreaRect.top;
+    // If a weapon is selected and click is on empty space, start aiming
+    if (selectedWeaponId) {
+        const gameAreaRect = gameAreaRef.current.getBoundingClientRect();
+        const mouseX = e.clientX - gameAreaRect.left;
+        const mouseY = e.clientY - gameAreaRect.top;
 
-    setIsAiming(true);
-    setAimStartPoint({ x: mouseX, y: mouseY });
-    setAimEndPoint({ x: mouseX, y: mouseY });
-  }, [selectedWeaponId, missile, handleFireSequence, stickmanStateRef]);
+        setIsAiming(true);
+        setAimStartPoint({ x: mouseX, y: mouseY });
+        setAimEndPoint({ x: mouseX, y: mouseY });
+    }
+    // If no weapon selected and click on empty space, do nothing.
+}, [selectedWeaponId, missile?.active]);
 
   const handleGameAreaTouchStart = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
     if (e.touches.length === 1 && !missile?.active) {
       const touch = e.touches[0];
-      // Create a synthetic event that mimics MouseEvent enough for handleGameAreaMouseDown
       const pseudoMouseEvent = {
           clientX: touch.clientX,
           clientY: touch.clientY,
-          preventDefault: () => e.preventDefault(), // Important for touch
+          preventDefault: () => e.preventDefault(), 
           stopPropagation: () => e.stopPropagation(),
           target: e.target, 
       } as unknown as React.MouseEvent<HTMLDivElement>;
       handleGameAreaMouseDown(pseudoMouseEvent);
     }
-  }, [handleGameAreaMouseDown, missile]);
+  }, [handleGameAreaMouseDown, missile?.active]);
 
   const handleGlobalMouseMove = useCallback((event: MouseEvent | TouchEvent) => {
     if (!gameAreaRef.current) return;
@@ -314,29 +308,28 @@ export function GameArea() {
     const mouseX = clientX - gameAreaRect.left;
     const mouseY = clientY - gameAreaRect.top;
 
-    if (isAiming && aimStartPoint && !missile?.active) {
+    if (isAiming && aimStartPoint && !missile?.active) { // Check missile?.active here too
       setAimEndPoint({ x: mouseX, y: mouseY });
     }
 
-    if (stickmanStateRef.current.isBeingDragged && dragStartOffsetRef.current && !selectedWeaponId && !missile?.active) {
-        const currentDragOffsetX = dragStartOffsetRef.current.offsetX;
-        const currentDragOffsetY = dragStartOffsetRef.current.offsetY;
-
+    // Dragging Anil logic
+    const currentDragStartOffset = dragStartOffsetRef.current;
+    if (stickmanStateRef.current.isBeingDragged && currentDragStartOffset && !selectedWeaponId && !missile?.active) {
         if (lastMousePositionRef.current) {
           previousMousePositionRef.current = { ...lastMousePositionRef.current };
         }
         lastMousePositionRef.current = { x: clientX, y: clientY, timestamp: Date.now() };
 
         setStickmanState(prev => {
-            if (!prev.isBeingDragged) return prev;
+            if (!prev.isBeingDragged) return prev; // Should not happen if currentDragStartOffset is set
             return {
                 ...prev,
-                x: mouseX - currentDragOffsetX, 
-                y: mouseY - currentDragOffsetY, 
+                x: mouseX - currentDragStartOffset.offsetX, 
+                y: mouseY - currentDragStartOffset.offsetY, 
             };
         });
     }
-  }, [isAiming, aimStartPoint, selectedWeaponId, missile]);
+  }, [isAiming, aimStartPoint, selectedWeaponId, missile?.active]);
 
 
   const handleGlobalMouseUp = useCallback(() => {
@@ -357,18 +350,18 @@ export function GameArea() {
             const dy = lastMousePositionRef.current.y - previousMousePositionRef.current.y;
             const dtSeconds = (lastMousePositionRef.current.timestamp - previousMousePositionRef.current.timestamp) / 1000;
 
-            if (dtSeconds > 0.001 && dtSeconds < 0.5) { // Check for plausible dt
+            if (dtSeconds > 0.001 && dtSeconds < 0.5) { 
                 const velocityScale = TARGET_FRAME_TIME_S * THROW_VELOCITY_MULTIPLIER;
                 throwVx = (dx / dtSeconds) * velocityScale;
                 throwVy = (dy / dtSeconds) * velocityScale;
-                const maxThrowSpeed = 40; // Increased max throw speed
+                const maxThrowSpeed = 40; 
                 throwVx = Math.max(-maxThrowSpeed, Math.min(maxThrowSpeed, throwVx));
                 throwVy = Math.max(-maxThrowSpeed, Math.min(maxThrowSpeed, throwVy));
-            } else { // Fallback if dt is too small/large or no previous point
+            } else { 
                 throwVx = (Math.random() - 0.5) * 5;
                 throwVy = (Math.random() - 0.5) * 5 - 2;
             }
-        } else { // Fallback if no previous point
+        } else { 
             throwVx = (Math.random() - 0.5) * 3;
             throwVy = (Math.random() - 0.5) * 3 -1;
         }
@@ -380,14 +373,17 @@ export function GameArea() {
         lastMousePositionRef.current = null;
         previousMousePositionRef.current = null;
     }
-  }, [isAiming, aimStartPoint, aimEndPoint, handleFireSequence, selectedWeaponId, missile]);
+  }, [isAiming, aimStartPoint, aimEndPoint, handleFireSequence, selectedWeaponId, missile?.active]);
 
 
   useEffect(() => {
     const moveListener = (e: MouseEvent | TouchEvent) => handleGlobalMouseMove(e);
     const upListener = () => handleGlobalMouseUp();
 
-    if (isAiming || (stickmanStateRef.current.isBeingDragged && !selectedWeaponId && !missile?.active)) {
+    // Check if dragging Anil or Aiming
+    const isInteracting = isAiming || (stickmanStateRef.current.isBeingDragged && !selectedWeaponId && !missile?.active)
+
+    if (isInteracting) {
       document.addEventListener('mousemove', moveListener);
       document.addEventListener('mouseup', upListener);
       document.addEventListener('touchmove', moveListener, { passive: false });
@@ -405,25 +401,24 @@ export function GameArea() {
       document.removeEventListener('touchmove', moveListener);
       document.removeEventListener('touchend', upListener);
     };
-  }, [isAiming, handleGlobalMouseMove, handleGlobalMouseUp, selectedWeaponId, missile]);
+  }, [isAiming, handleGlobalMouseMove, handleGlobalMouseUp, selectedWeaponId, missile?.active]);
+  // Rerun effect if isAiming changes, or selectedWeaponId/missile (to re-evaluate stickman drag condition)
 
 
   const handleAnilKhadkuMouseDown = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     e.preventDefault(); 
     e.stopPropagation(); 
 
-    if (missile?.active) return; // Don't interact if missile is flying
+    if (missile?.active) return; 
 
     if (selectedWeaponId) {
-      // Fire selected weapon directly at Anil
-      const anilCenterX = stickmanStateRef.current.x;
+      const anilCenterX = stickmanStateRef.current.x; // Use ref for current position
       const anilCenterY = stickmanStateRef.current.y;
-       // For direct fire, "start" can be arbitrary point away from Anil, or center of game area
       const fireStartX = gameAreaRef.current ? gameAreaRef.current.getBoundingClientRect().width / 2 : anilCenterX - 100;
       const fireStartY = gameAreaRef.current ? gameAreaRef.current.getBoundingClientRect().height / 10 : anilCenterY - 100; 
       
       handleFireSequence({ x: fireStartX, y: fireStartY }, { x: anilCenterX, y: anilCenterY }, true);
-    } else { // No weapon selected, initiate drag
+    } else { 
       if (!gameAreaRef.current) return;
       const clientX = e.clientX;
       const clientY = e.clientY;
@@ -437,17 +432,17 @@ export function GameArea() {
       };
       const now = Date.now();
       lastMousePositionRef.current = { x: clientX, y: clientY, timestamp: now };
-      previousMousePositionRef.current = { ...lastMousePositionRef.current };
+      previousMousePositionRef.current = { ...lastMousePositionRef.current }; // Initialize previous for immediate throw calc
 
       setStickmanState(prev => ({
         ...prev,
         isBeingDragged: true,
-        isHit: false, // Clear hit state on drag start
-        vx: 0, // Stop momentum when grabbed
+        isHit: false, 
+        vx: 0, 
         vy: 0,
       }));
     }
-  }, [selectedWeaponId, missile, handleFireSequence, stickmanStateRef]);
+  }, [selectedWeaponId, missile?.active, handleFireSequence]);
 
   const handleAnilKhadkuClick = useCallback(() => {
     if (selectedWeaponId || stickmanStateRef.current.isBeingDragged || missile?.active) return; 
@@ -461,15 +456,16 @@ export function GameArea() {
       ...prev,
       isHit: true,
       vx: prev.vx + Math.cos(hitAngle) * CLICK_IMPULSE_STRENGTH,
-      vy: prev.vy + Math.sin(hitAngle) * CLICK_IMPULSE_STRENGTH - 5, // a bit upwards
+      vy: prev.vy + Math.sin(hitAngle) * CLICK_IMPULSE_STRENGTH - 5, 
       rotation: (prev.rotation + (Math.random() -0.5) * 90 ) % 360
     }));
     setTimeout(() => setStickmanState(prev => ({ ...prev, isHit: false })), 500);
-  }, [selectedWeaponId, missile, toast, stickmanStateRef]);
+  }, [selectedWeaponId, missile?.active, toast]);
 
 
   const handleAnilKhadkuTouchStart = useCallback((e: React.TouchEvent<SVGSVGElement>) => {
     if (e.touches.length === 1 && !missile?.active) {
+        e.preventDefault(); // Prevent scrolling on touch device
         const touch = e.touches[0];
         const pseudoMouseEvent = {
             clientX: touch.clientX,
@@ -480,7 +476,7 @@ export function GameArea() {
         } as unknown as React.MouseEvent<SVGSVGElement>;
         handleAnilKhadkuMouseDown(pseudoMouseEvent);
     }
-  }, [handleAnilKhadkuMouseDown, missile]);
+  }, [handleAnilKhadkuMouseDown, missile?.active]);
 
 
   const toggleWeapon = (weaponId: string) => {
@@ -506,7 +502,7 @@ export function GameArea() {
                 selectedWeaponId === weapon.id && "ring-2 ring-primary-foreground ring-offset-2 ring-offset-primary"
               )}
               title={weapon.name}
-              disabled={missile?.active} // Disable weapon switch if missile is active
+              disabled={missile?.active} 
             >
               <Icon className={cn("h-8 w-8 mb-1", selectedWeaponId === weapon.id ? "text-primary-foreground": "text-primary")} />
               <span className="text-xs">{weapon.name}</span>
@@ -563,10 +559,10 @@ export function GameArea() {
           )}
           {missile && missile.active && (
             <Rocket
-              className="text-primary absolute pointer-events-none h-8 w-8" // Adjust size as needed
+              className="text-primary absolute pointer-events-none h-8 w-8" 
               style={{
-                left: missile.currentX - 16, // Adjust for icon center
-                top: missile.currentY - 16,  // Adjust for icon center
+                left: missile.currentX - 16, 
+                top: missile.currentY - 16,  
                 transform: `rotate(${missile.rotation}deg)`,
                 willChange: 'left, top, transform',
               }}
@@ -577,11 +573,10 @@ export function GameArea() {
               key={explosion.id} 
               className="absolute rounded-full animate-explode pointer-events-none"
               style={{
-                left: explosion.x,
-                top: explosion.y,
-                width: '10px', // Initial small size for explosion center
-                height: '10px',
-                transform: 'translate(-50%, -50%)', // Center the explosion
+                left: `${explosion.x}px`,
+                top: `${explosion.y}px`,
+                // Initial size set in CSS keyframes 0%
+                // transform to center is also in keyframes
               }}
              />
           )}
@@ -593,3 +588,4 @@ export function GameArea() {
     </div>
   );
 }
+

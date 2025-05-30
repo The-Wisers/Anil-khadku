@@ -125,28 +125,44 @@ body {
   animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
 }
 
-/* Explosion animation */
+/* Enhanced Explosion animation */
 @keyframes explode {
   0% {
-    width: 10px;
+    width: 10px; /* Start small */
     height: 10px;
-    background-color: hsl(var(--accent)); /* Orange */
+    background-color: hsl(var(--accent) / 0.9); /* Bright orange */
+    border-radius: 50%;
+    transform: translate(-50%, -50%) scale(0.2);
     opacity: 1;
-    transform: translate(-50%, -50%) scale(0.5);
+    box-shadow: 0 0 20px 10px hsl(var(--accent) / 0.7);
   }
-  50% {
-    background-color: hsl(var(--primary)); /* Red */
-    opacity: 0.7;
+  20% { /* Quick bright flash */
+    background-color: hsl(0 0% 100% / 0.95); /* White flash */
+    box-shadow: 0 0 40px 20px hsl(0 0% 100% / 0.6);
+    transform: translate(-50%, -50%) scale(0.6);
+    opacity: 0.9;
+  }
+  60% {
+    width: 150px;
+    height: 150px;
+    background-color: hsl(var(--primary) / 0.7); /* Red, more transparent */
+    box-shadow: 0 0 60px 30px hsl(var(--primary) / 0.4);
+    opacity: 0.8;
+    transform: translate(-50%, -50%) scale(1.5);
   }
   100% {
-    width: 100px; /* Final size of explosion */
-    height: 100px;
-    background-color: hsl(var(--destructive)); /* Darker Red */
+    width: 250px; /* Final size of explosion - much bigger */
+    height: 250px;
+    background-color: hsl(var(--destructive) / 0.3); /* Darker Red, very transparent */
+    box-shadow: 0 0 30px 15px hsl(var(--destructive) / 0.1);
     opacity: 0;
-    transform: translate(-50%, -50%) scale(1.5);
+    transform: translate(-50%, -50%) scale(2.5); /* Scale up more */
   }
 }
 
 .animate-explode {
-  animation: explode 0.5s forwards;
+  /* Ensure position is absolute if not already handled by inline style */
+  /* position: absolute;  Handled by inline style for left/top */
+  /* transform-origin: center center; Handled by translate */
+  animation: explode 0.6s forwards; /* Slightly longer duration */
 }
