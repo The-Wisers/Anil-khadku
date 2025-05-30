@@ -11,7 +11,7 @@ const GRAVITY = 0.6;
 const FRICTION = 0.99; // Air friction
 const GROUND_FRICTION = 0.9;
 const RESTITUTION = 0.6; // Bounciness
-const THROW_VELOCITY_MULTIPLIER = 1.5; // Adjusted for new velocity calculation
+const THROW_VELOCITY_MULTIPLIER = 1.5; 
 const STICKMAN_WIDTH = 48; 
 const STICKMAN_HEIGHT = 72; 
 const CLICK_IMPULSE_STRENGTH = 15;
@@ -29,7 +29,6 @@ export function GameArea() {
   });
   const gameAreaRef = useRef<HTMLDivElement>(null);
   const dragStartOffsetRef = useRef<{ offsetX: number; offsetY: number } | null>(null);
-  // Store last two points with timestamps for velocity calculation
   const lastMousePositionRef = useRef<{ x: number; y: number; timestamp: number } | null>(null);
   const previousMousePositionRef = useRef<{ x: number; y: number; timestamp: number } | null>(null);
   
@@ -44,7 +43,7 @@ export function GameArea() {
         return prev; 
       }
 
-      let { x, y, vx, vy, rotation } = prev; // isHit is handled by interaction
+      let { x, y, vx, vy, rotation } = prev; 
       const gameAreaRect = gameAreaRef.current!.getBoundingClientRect();
       
       vy += GRAVITY;
@@ -83,7 +82,7 @@ export function GameArea() {
          rotation = (rotation + vx * 0.5) % 360;
       }
       
-      return { ...prev, x, y, vx, vy, rotation }; // Removed isHit from here, it's event-driven
+      return { ...prev, x, y, vx, vy, rotation };
     });
 
     animationFrameIdRef.current = requestAnimationFrame(gameLoop);
@@ -116,7 +115,7 @@ export function GameArea() {
       };
       const now = Date.now();
       lastMousePositionRef.current = { x: clientX, y: clientY, timestamp: now };
-      previousMousePositionRef.current = { x: clientX, y: clientY, timestamp: now }; // Initialize previous to current
+      previousMousePositionRef.current = { x: clientX, y: clientY, timestamp: now };
 
       return { 
         ...prev, 
@@ -129,16 +128,19 @@ export function GameArea() {
   };
 
   const handleMouseMove = useCallback((event: MouseEvent | TouchEvent) => {
-    if (!gameAreaRef.current || !dragStartOffsetRef.current) return;
-
-    // These are captured at the start of the event, stable for this handler invocation
+    if (!gameAreaRef.current || !dragStartOffsetRef.current) {
+      // If dragStartOffsetRef is null, a mouseup likely occurred or mousedown didn't set it.
+      return;
+    }
+    
+    // Offsets are captured when drag starts and stored in dragStartOffsetRef.current.
+    // They are stable for the duration of this drag instance.
     const currentDragOffsetX = dragStartOffsetRef.current.offsetX;
     const currentDragOffsetY = dragStartOffsetRef.current.offsetY;
 
     const clientX = (event instanceof MouseEvent) ? event.clientX : event.touches[0].clientX;
     const clientY = (event instanceof MouseEvent) ? event.clientY : event.touches[0].clientY;
     
-    // Update previous mouse position before updating the last one
     if (lastMousePositionRef.current) {
       previousMousePositionRef.current = { ...lastMousePositionRef.current };
     }
@@ -149,7 +151,7 @@ export function GameArea() {
     const mouseYInGameArea = clientY - gameAreaRect.top;
 
     setStickmanState(prev => {
-      // Only update position if dragging is still active according to the latest state
+      // Only update position if dragging is still active according to the latest state.
       if (!prev.isBeingDragged) return prev; 
       
       return {
@@ -158,41 +160,38 @@ export function GameArea() {
         y: mouseYInGameArea - currentDragOffsetY,
       };
     });
-  }, []); // Empty deps: setStickmanState is stable, refs are stable
+  }, []); // Empty dependency array: setStickmanState and refs are stable.
 
   const handleMouseUp = useCallback(() => {
+    let throwVx = 0;
+    let throwVy = 0;
+
+    if (lastMousePositionRef.current && previousMousePositionRef.current && 
+        previousMousePositionRef.current.timestamp < lastMousePositionRef.current.timestamp) {
+      
+      const dx = lastMousePositionRef.current.x - previousMousePositionRef.current.x;
+      const dy = lastMousePositionRef.current.y - previousMousePositionRef.current.y;
+      const dtSeconds = (lastMousePositionRef.current.timestamp - previousMousePositionRef.current.timestamp) / 1000;
+
+      if (dtSeconds > 0.001) { 
+        const velocityScale = TARGET_FRAME_TIME_S * THROW_VELOCITY_MULTIPLIER;
+        throwVx = (dx / dtSeconds) * velocityScale;
+        throwVy = (dy / dtSeconds) * velocityScale;
+        
+        const maxThrowSpeed = 30; 
+        throwVx = Math.max(-maxThrowSpeed, Math.min(maxThrowSpeed, throwVx));
+        throwVy = Math.max(-maxThrowSpeed, Math.min(maxThrowSpeed, throwVy));
+      } else {
+         throwVx = (Math.random() - 0.5) * 5; 
+         throwVy = (Math.random() - 0.5) * 5 - 2; 
+      }
+    } else {
+      throwVx = (Math.random() - 0.5) * 3;
+      throwVy = (Math.random() - 0.5) * 3 -1;
+    }
+    
     setStickmanState(prev => {
       if (!prev.isBeingDragged) return prev;
-
-      let throwVx = 0;
-      let throwVy = 0;
-
-      if (lastMousePositionRef.current && previousMousePositionRef.current && 
-          previousMousePositionRef.current.timestamp < lastMousePositionRef.current.timestamp) {
-        
-        const dx = lastMousePositionRef.current.x - previousMousePositionRef.current.x;
-        const dy = lastMousePositionRef.current.y - previousMousePositionRef.current.y;
-        const dtSeconds = (lastMousePositionRef.current.timestamp - previousMousePositionRef.current.timestamp) / 1000;
-
-        if (dtSeconds > 0.001) { // Avoid division by zero or tiny dt
-          // Convert velocity (pixels/sec) to (pixels/frame)
-          const velocityScale = TARGET_FRAME_TIME_S * THROW_VELOCITY_MULTIPLIER;
-          throwVx = (dx / dtSeconds) * velocityScale;
-          throwVy = (dy / dtSeconds) * velocityScale;
-          
-          const maxThrowSpeed = 30; // Max speed in pixels/frame
-          throwVx = Math.max(-maxThrowSpeed, Math.min(maxThrowSpeed, throwVx));
-          throwVy = Math.max(-maxThrowSpeed, Math.min(maxThrowSpeed, throwVy));
-        } else {
-           // Fallback for very fast flicks or no movement
-           throwVx = (Math.random() - 0.5) * 5; 
-           throwVy = (Math.random() - 0.5) * 5 - 2; // Slight upward bias
-        }
-      } else {
-        // Fallback if not enough data (e.g. click release without much drag)
-        throwVx = (Math.random() - 0.5) * 3;
-        throwVy = (Math.random() - 0.5) * 3 -1;
-      }
       
       return { 
         ...prev, 
@@ -202,14 +201,13 @@ export function GameArea() {
       };
     });
     
-    // Clear refs after state update is queued
     dragStartOffsetRef.current = null;
     lastMousePositionRef.current = null;
     previousMousePositionRef.current = null;
-  }, [THROW_VELOCITY_MULTIPLIER]); // THROW_VELOCITY_MULTIPLIER is a const effectively
+  }, [THROW_VELOCITY_MULTIPLIER]); // THROW_VELOCITY_MULTIPLIER is a const.
 
   useEffect(() => {
-    // handleMouseMove and handleMouseUp are stable due to their useCallback deps
+    // handleMouseMove and handleMouseUp are now stable due to their useCallback deps.
     const moveListener = (e: MouseEvent | TouchEvent) => handleMouseMove(e);
     const upListener = () => handleMouseUp();
 
@@ -219,14 +217,12 @@ export function GameArea() {
       document.addEventListener('touchmove', moveListener, { passive: false });
       document.addEventListener('touchend', upListener);
     } else {
-      // Cleanup listeners when not dragging
       document.removeEventListener('mousemove', moveListener);
       document.removeEventListener('mouseup', upListener);
       document.removeEventListener('touchmove', moveListener);
       document.removeEventListener('touchend', upListener);
     }
 
-    // This return function is the cleanup for the useEffect hook
     return () => {
       document.removeEventListener('mousemove', moveListener);
       document.removeEventListener('mouseup', upListener);
@@ -237,6 +233,8 @@ export function GameArea() {
 
 
   const handleInteraction = () => { 
+    // Check current state: if isBeingDragged is true, mouseup hasn't been processed by state yet
+    // or it's a genuine click without drag.
     if (stickmanState.isBeingDragged) return;
 
     toast({
@@ -260,12 +258,11 @@ export function GameArea() {
     if (e.touches.length === 1) {
         e.preventDefault(); 
         const touch = e.touches[0];
-        // Simulate a MouseEvent for handleMouseDown
         const pseudoMouseEvent = {
             clientX: touch.clientX,
             clientY: touch.clientY,
             preventDefault: () => e.preventDefault(),
-        } as unknown as React.MouseEvent<SVGSVGElement>; // Cast needed for type compatibility
+        } as unknown as React.MouseEvent<SVGSVGElement>; 
         handleMouseDown(pseudoMouseEvent);
     }
   };
@@ -293,4 +290,3 @@ export function GameArea() {
     </Card>
   );
 }
-
