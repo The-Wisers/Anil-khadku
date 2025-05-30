@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from 'react';
@@ -38,13 +39,21 @@ export function GameArea({ selectedWeapon, sessionStats, updateSessionStats }: G
   };
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (!dragStartRef.current || !stickmanState.isBeingDragged) return;
-    const dx = e.clientX - dragStartRef.current.x;
-    const dy = e.clientY - dragStartRef.current.y;
+    if (!stickmanState.isBeingDragged || !dragStartRef.current) {
+      return;
+    }
+
+    // Capture all necessary values from dragStartRef.current synchronously
+    // to avoid issues if it's nulled by handleMouseUp before setStickmanState's updater runs.
+    const { x: dragRefX, y: dragRefY, stickmanX: dragRefStickmanX, stickmanY: dragRefStickmanY } = dragStartRef.current;
+
+    const dx = e.clientX - dragRefX;
+    const dy = e.clientY - dragRefY;
+
     setStickmanState(prev => ({
       ...prev,
-      x: dragStartRef.current!.stickmanX + dx,
-      y: dragStartRef.current!.stickmanY + dy,
+      x: dragRefStickmanX + dx,
+      y: dragRefStickmanY + dy,
     }));
   }, [stickmanState.isBeingDragged]);
 
