@@ -1,6 +1,7 @@
+
 "use client";
 
-import type { SessionStats, Weapon } from '@/lib/types';
+import type { SessionStats } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ListChecks, Zap } from 'lucide-react';
 
@@ -11,6 +12,8 @@ interface SessionStatsProps {
 }
 
 export function SessionStatsDisplay({ stats }: SessionStatsProps) {
+  const weaponUses = stats.weaponUses || {}; // Default to an empty object if undefined
+
   return (
     <Card className="h-full flex flex-col shadow-lg">
       <CardHeader>
@@ -30,11 +33,11 @@ export function SessionStatsDisplay({ stats }: SessionStatsProps) {
         </div>
         <div>
           <h4 className="font-semibold text-lg">Weapon Usage</h4>
-          {Object.keys(stats.weaponUses).length === 0 ? (
+          {Object.keys(weaponUses).length === 0 ? (
             <p className="text-muted-foreground">No weapons used yet.</p>
           ) : (
             <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
-              {Object.entries(stats.weaponUses).map(([weaponId, count]) => (
+              {Object.entries(weaponUses).map(([weaponId, count]) => (
                 <li key={weaponId}>
                   <span className="font-medium text-foreground">{weaponId.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>: {count} times
                 </li>
