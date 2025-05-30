@@ -14,8 +14,10 @@ export interface SessionStats {
 }
 
 export interface StickmanState {
-  x: number;
-  y: number;
+  x: number; // Center X position in game area
+  y: number; // Center Y position in game area
+  vx: number; // Velocity X
+  vy: number; // Velocity Y
   rotation: number;
   isBeingDragged: boolean;
   isHit: boolean;

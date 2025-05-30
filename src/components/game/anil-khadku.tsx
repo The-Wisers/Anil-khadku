@@ -8,9 +8,13 @@ import { useState, useEffect } from 'react';
 
 interface AnilKhadkuProps extends SVGProps<SVGSVGElement> {
   state: StickmanState;
+  // x and y from state are now center, so we adjust translation
+  // width and height are needed for centering calculation
+  width?: number;
+  height?: number;
 }
 
-export function AnilKhadku({ state, className, ...props }: AnilKhadkuProps) {
+export function AnilKhadku({ state, className, width = 48, height = 72, ...props }: AnilKhadkuProps) {
   const [limbRotations, setLimbRotations] = useState({
     leftArm: 0,
     rightArm: 0,
@@ -19,34 +23,42 @@ export function AnilKhadku({ state, className, ...props }: AnilKhadkuProps) {
   });
 
   useEffect(() => {
+    let timer: NodeJS.Timeout;
     if (state.isHit) {
       setLimbRotations({
-        leftArm: -45 + (Math.random() - 0.5) * 40, // Swing back & up
-        rightArm: -45 + (Math.random() - 0.5) * 40, // Swing back & up
-        leftLeg: 30 + (Math.random() - 0.5) * 40,  // Swing forward & up
-        rightLeg: 30 + (Math.random() - 0.5) * 40,  // Swing forward & up
+        leftArm: -45 + (Math.random() - 0.5) * 40,
+        rightArm: -45 + (Math.random() - 0.5) * 40,
+        leftLeg: 30 + (Math.random() - 0.5) * 40,
+        rightLeg: 30 + (Math.random() - 0.5) * 40,
       });
 
-      const timer = setTimeout(() => {
+      timer = setTimeout(() => {
         setLimbRotations({ leftArm: 0, rightArm: 0, leftLeg: 0, rightLeg: 0 });
-      }, 500); // Duration of flail, matches shake animation
-
-      return () => clearTimeout(timer);
+      }, 500); 
     }
+    return () => clearTimeout(timer);
   }, [state.isHit]);
+  
+  // Calculate top-left for SVG positioning based on center x, y
+  const svgX = state.x - width / 2;
+  const svgY = state.y - height / 2;
 
   return (
     <svg
-      viewBox="-50 -10 100 120" // Adjusted viewBox for better centering and space
+      viewBox="-50 -10 100 120"
       className={cn(
-        "w-48 h-72 cursor-grab transition-transform duration-75 ease-out",
+        "w-48 h-72 cursor-grab transition-transform duration-0 ease-out", // Removed duration-75 for smoother physics
         state.isBeingDragged && "cursor-grabbing scale-105",
         state.isHit && "animate-shake",
         className
       )}
       style={{
-        transform: `translate(${state.x}px, ${state.y}px) rotate(${state.rotation}deg)`,
-        transformOrigin: 'center center', // Ensures rotation is around the body's center
+        // Position is now absolute within the GameArea based on physics
+        position: 'absolute',
+        left: `${svgX}px`,
+        top: `${svgY}px`,
+        transform: `rotate(${state.rotation}deg)`,
+        transformOrigin: 'center center', 
       }}
       {...props}
     >
@@ -58,14 +70,12 @@ export function AnilKhadku({ state, className, ...props }: AnilKhadkuProps) {
         <line x1="0" y1="20" x2="0" y2="60" fill="hsl(var(--foreground))" />
 
         {/* Arms - Attached at (0,30) */}
-        {/* Left Arm: original (0,30) to (-25,45) => drawn from (0,0) to (-25,15) then translated and rotated */}
         <line 
           x1="0" y1="0" x2="-25" y2="15" 
           style={{ transformOrigin: '0px 0px' }}
           transform={`translate(0, 30) rotate(${limbRotations.leftArm})`} 
           fill="hsl(var(--foreground))" 
         />
-        {/* Right Arm: original (0,30) to (25,45) => drawn from (0,0) to (25,15) then translated and rotated */}
         <line 
           x1="0" y1="0" x2="25" y2="15" 
           style={{ transformOrigin: '0px 0px' }}
@@ -74,14 +84,12 @@ export function AnilKhadku({ state, className, ...props }: AnilKhadkuProps) {
         />
 
         {/* Legs - Attached at (0,60) */}
-        {/* Left Leg: original (0,60) to (-20,90) => drawn from (0,0) to (-20,30) then translated and rotated */}
         <line 
           x1="0" y1="0" x2="-20" y2="30" 
           style={{ transformOrigin: '0px 0px' }}
           transform={`translate(0, 60) rotate(${limbRotations.leftLeg})`} 
           fill="hsl(var(--foreground))" 
         />
-        {/* Right Leg: original (0,60) to (20,90) => drawn from (0,0) to (20,30) then translated and rotated */}
         <line 
           x1="0" y1="0" x2="20" y2="30" 
           style={{ transformOrigin: '0px 0px' }}
@@ -90,19 +98,16 @@ export function AnilKhadku({ state, className, ...props }: AnilKhadkuProps) {
         />
       </g>
       
-      {/* Facial expression change on hit */}
       {state.isHit && (
         <g stroke="hsl(var(--primary))" fill="none" strokeWidth="1.5">
-          {/* X'd out eyes */}
           <line x1="-4" y1="7" x2="-0" y2="11" /> 
           <line x1="-0" y1="7" x2="-4" y2="11" />
           <line x1="4" y1="7" x2="0" y2="11" />
           <line x1="0" y1="7" x2="4" y2="11" />
-          {/* Sad/Ouch mouth */}
           <path d="M -3 14 Q 0 12 3 14" />
         </g>
       )}
-      {!state.isHit && ( // Default simple face
+      {!state.isHit && (
          <g stroke="hsl(var(--foreground))" fill="none" strokeWidth="1">
             <circle cx="-2.5" cy="8" r="0.5" fill="hsl(var(--foreground))" />
             <circle cx="2.5" cy="8" r="0.5" fill="hsl(var(--foreground))" />
