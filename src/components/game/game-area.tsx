@@ -7,7 +7,7 @@ import { AnilKhadku } from './anil-khadku';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { Rocket, MousePointerSquare, Target, Ban } from 'lucide-react';
+import { Rocket, Crosshair, Target, Ban } from 'lucide-react'; // Changed MousePointerSquare to Crosshair
 import { cn } from '@/lib/utils';
 
 const GRAVITY = 0.6;
@@ -23,7 +23,7 @@ const TARGET_FRAME_TIME_S = 1 / 60; // Assuming 60 FPS for physics scaling
 
 const initialWeapons: Weapon[] = [
   { id: 'missile', name: 'Missile', icon: Rocket, description: 'Explosive fun!', damage: 50 },
-  { id: 'gun', name: 'Gun', icon: MousePointerSquare, description: 'Precision shot.', damage: 30 },
+  { id: 'gun', name: 'Gun', icon: Crosshair, description: 'Precision shot.', damage: 30 }, // Changed icon here
   { id: 'bow', name: 'Bow', icon: Target, description: 'Archery skills.', damage: 25 },
 ];
 
@@ -162,7 +162,8 @@ export function GameArea() {
   const handleGameAreaMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (!selectedWeaponId || !gameAreaRef.current) return;
     // Prevent starting aim if click is on Anil Khadku (handled by AnilKhadku's onMouseDown)
-    if ((e.target as HTMLElement).closest_internal_prop_do_not_use === 'AnilKhadkuSVG') return;
+     // @ts-ignore - checking custom prop
+    if ((e.target as HTMLElement).closest_internal_prop_do_not_use === 'AnilKhadkuSVG' || (e.target as HTMLElement).closest('[data-id="AnilKhadkuSVG"]')) return;
 
 
     const gameAreaRect = gameAreaRef.current.getBoundingClientRect();
@@ -175,7 +176,7 @@ export function GameArea() {
   }, [selectedWeaponId]);
 
   const handleGlobalMouseMove = useCallback((event: MouseEvent | TouchEvent) => {
-    if (!isAiming || !aimStartPoint || !gameAreaRef.current) return;
+    if (!gameAreaRef.current) return;
 
     const clientX = (event instanceof MouseEvent) ? event.clientX : event.touches[0].clientX;
     const clientY = (event instanceof MouseEvent) ? event.clientY : event.touches[0].clientY;
@@ -183,7 +184,10 @@ export function GameArea() {
     const gameAreaRect = gameAreaRef.current.getBoundingClientRect();
     const mouseX = clientX - gameAreaRect.left;
     const mouseY = clientY - gameAreaRect.top;
-    setAimEndPoint({ x: mouseX, y: mouseY });
+
+    if (isAiming && aimStartPoint) {
+      setAimEndPoint({ x: mouseX, y: mouseY });
+    }
 
     // For dragging Anil
     if (stickmanState.isBeingDragged && dragStartOffsetRef.current && !selectedWeaponId) {
@@ -199,8 +203,8 @@ export function GameArea() {
             if (!prev.isBeingDragged) return prev;
             return {
                 ...prev,
-                x: mouseX - currentDragOffsetX,
-                y: mouseY - currentDragOffsetY,
+                x: mouseX - currentDragOffsetX, // mouseX is already gameArea relative
+                y: mouseY - currentDragOffsetY, // mouseY is already gameArea relative
             };
         });
     }
@@ -278,21 +282,18 @@ export function GameArea() {
 
 
   const handleAnilKhadkuMouseDown = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
-    e.preventDefault(); // Prevent text selection or other default browser actions
-    e.stopPropagation(); // Prevent game area mousedown if clicking on Anil
+    e.preventDefault(); 
+    e.stopPropagation(); 
 
     if (selectedWeaponId) {
-      // Fire weapon directly at Anil
       const selectedWeapon = availableWeapons.find(w => w.id === selectedWeaponId);
       toast({
           title: `Firing ${selectedWeapon?.name || 'weapon'}!`,
           description: `Direct hit on Anil!`,
       });
-      // Use Anil's center as both start and end for simplicity, or just end
       const anilCenter = { x: stickmanState.x, y: stickmanState.y };
-      fireWeapon(anilCenter, anilCenter); // start and end are same for direct hit
+      fireWeapon(anilCenter, anilCenter); 
     } else {
-      // Regular drag initiation
       if (!gameAreaRef.current) return;
       const clientX = e.clientX;
       const clientY = e.clientY;
@@ -310,8 +311,7 @@ export function GameArea() {
 
       setStickmanState(prev => ({
         ...prev,
-        x: stickmanState.x,
-        y: stickmanState.y,
+        // x and y remain the same until drag actually moves
         isBeingDragged: true,
         isHit: false,
         vx: 0,
@@ -321,8 +321,7 @@ export function GameArea() {
   }, [selectedWeaponId, stickmanState.x, stickmanState.y, fireWeapon, toast, availableWeapons]);
 
   const handleAnilKhadkuClick = useCallback(() => {
-    // This click is for non-weapon interaction (poke)
-    if (selectedWeaponId || stickmanState.isBeingDragged) return; // Already handled by mousedown or drag
+    if (selectedWeaponId || stickmanState.isBeingDragged) return; 
 
     toast({
       title: "Anil Khadku Poked!",
@@ -342,16 +341,13 @@ export function GameArea() {
 
   const handleAnilKhadkuTouchStart = useCallback((e: React.TouchEvent<SVGSVGElement>) => {
     if (e.touches.length === 1) {
-        // For touch, if a weapon is selected, a tap on Anil is a direct fire.
-        // If no weapon, it starts a drag.
-        // This logic is similar to handleAnilKhadkuMouseDown.
         const touch = e.touches[0];
         const pseudoMouseEvent = {
             clientX: touch.clientX,
             clientY: touch.clientY,
             preventDefault: () => e.preventDefault(),
             stopPropagation: () => e.stopPropagation(),
-            target: e.target, // Pass target along
+            target: e.target, 
         } as unknown as React.MouseEvent<SVGSVGElement>;
         handleAnilKhadkuMouseDown(pseudoMouseEvent);
     }
@@ -359,8 +355,8 @@ export function GameArea() {
 
 
   const toggleWeapon = (weaponId: string) => {
-    setSelectedWeaponId(prev => prev === weaponId ? null : weaponId);
-    setIsAiming(false); // Reset aiming state if weapon changes
+    setSelectedWeaponId(prev => (prev === weaponId || weaponId === "") ? null : weaponId);
+    setIsAiming(false); 
     setAimStartPoint(null);
     setAimEndPoint(null);
   };
@@ -391,7 +387,7 @@ export function GameArea() {
             key="none"
             variant={selectedWeaponId === null ? "secondary": "outline"}
             size="lg"
-            onClick={() => toggleWeapon("")} // Pass empty string or specific logic for "none"
+            onClick={() => toggleWeapon("")} 
             className={cn(
               "flex-col h-auto p-2",
                selectedWeaponId === null && "ring-2 ring-secondary-foreground ring-offset-2 ring-offset-secondary"
@@ -406,7 +402,7 @@ export function GameArea() {
         ref={gameAreaRef}
         className="flex-grow flex items-center justify-center relative overflow-hidden shadow-xl bg-muted/30 border-2 border-dashed border-accent/50 touch-none select-none"
         style={{ WebkitUserSelect: 'none', MozUserSelect: 'none', msUserSelect: 'none', userSelect: 'none' }}
-        onMouseDown={handleGameAreaMouseDown} // For aiming on game area background
+        onMouseDown={handleGameAreaMouseDown} 
         // onTouchStart for game area aiming (TODO if needed, complex with Anil's touch)
       >
         <CardContent className="w-full h-full flex items-center justify-center p-0 relative">
@@ -414,15 +410,11 @@ export function GameArea() {
             state={stickmanState}
             width={STICKMAN_WIDTH}
             height={STICKMAN_HEIGHT}
-            onMouseDown={handleAnilKhadkuMouseDown} // Handles drag OR direct fire
-            onClick={handleAnilKhadkuClick} // Handles poke IF no weapon selected
-            onTouchStart={handleAnilKhadkuTouchStart} // Handles touch drag OR direct fire
+            onMouseDown={handleAnilKhadkuMouseDown} 
+            onClick={handleAnilKhadkuClick} 
+            onTouchStart={handleAnilKhadkuTouchStart} 
             style={{ willChange: 'transform, top, left' }}
-            // Add a custom prop to identify the SVG element to avoid aiming conflict
-            // This is a bit of a hack, a more robust way would be event.target checks or refs
-            // but for simplicity:
-            // @ts-ignore
-            closest_internal_prop_do_not_use="AnilKhadkuSVG"
+            data-id="AnilKhadkuSVG" // Added for easier event target identification
           />
           {isAiming && aimStartPoint && aimEndPoint && (
             <svg className="absolute inset-0 w-full h-full pointer-events-none">
@@ -446,3 +438,4 @@ export function GameArea() {
     </div>
   );
 }
+
