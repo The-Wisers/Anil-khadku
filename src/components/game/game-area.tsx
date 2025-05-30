@@ -2,20 +2,17 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import type { StickmanState, Weapon, SessionStats } from '@/lib/types';
+import type { StickmanState } from '@/lib/types'; // Removed Weapon, SessionStats
 import { AnilKhadku } from './anil-khadku';
 import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Target } from 'lucide-react';
+// Removed Button and Target imports
 import { useToast } from '@/hooks/use-toast';
 
 interface GameAreaProps {
-  selectedWeapon: Weapon | null;
-  sessionStats: SessionStats;
-  updateSessionStats: (newStats: Partial<SessionStats> | ((prev: SessionStats) => SessionStats)) => void;
+  // Removed selectedWeapon, sessionStats, updateSessionStats props
 }
 
-export function GameArea({ selectedWeapon, sessionStats, updateSessionStats }: GameAreaProps) {
+export function GameArea({ }: GameAreaProps) { // Props are now empty
   const [stickmanState, setStickmanState] = useState<StickmanState>({
     x: 0,
     y: 0,
@@ -29,9 +26,12 @@ export function GameArea({ selectedWeapon, sessionStats, updateSessionStats }: G
 
   const handleMouseDown = (e: React.MouseEvent<SVGSVGElement>) => {
     e.preventDefault();
+    if (!gameAreaRef.current) return;
+
+    const rect = gameAreaRef.current.getBoundingClientRect();
     dragStartRef.current = {
-      x: e.clientX,
-      y: e.clientY,
+      x: e.clientX - rect.left, // Make coordinates relative to the game area
+      y: e.clientY - rect.top,
       stickmanX: stickmanState.x,
       stickmanY: stickmanState.y,
     };
@@ -39,16 +39,15 @@ export function GameArea({ selectedWeapon, sessionStats, updateSessionStats }: G
   };
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (!stickmanState.isBeingDragged || !dragStartRef.current) {
+    if (!stickmanState.isBeingDragged || !dragStartRef.current || !gameAreaRef.current) {
       return;
     }
-
-    // Capture all necessary values from dragStartRef.current synchronously
-    // to avoid issues if it's nulled by handleMouseUp before setStickmanState's updater runs.
+    
     const { x: dragRefX, y: dragRefY, stickmanX: dragRefStickmanX, stickmanY: dragRefStickmanY } = dragStartRef.current;
+    const rect = gameAreaRef.current.getBoundingClientRect();
 
-    const dx = e.clientX - dragRefX;
-    const dy = e.clientY - dragRefY;
+    const dx = (e.clientX - rect.left) - dragRefX;
+    const dy = (e.clientY - rect.top) - dragRefY;
 
     setStickmanState(prev => ({
       ...prev,
@@ -60,8 +59,6 @@ export function GameArea({ selectedWeapon, sessionStats, updateSessionStats }: G
   const handleMouseUp = useCallback(() => {
     if (stickmanState.isBeingDragged) {
       setStickmanState(prev => ({ ...prev, isBeingDragged: false }));
-      // Simple "throw" effect - could be more complex
-      // For now, just stop dragging.
     }
     dragStartRef.current = null;
   }, [stickmanState.isBeingDragged]);
@@ -81,53 +78,43 @@ export function GameArea({ selectedWeapon, sessionStats, updateSessionStats }: G
   }, [stickmanState.isBeingDragged, handleMouseMove, handleMouseUp]);
 
   const handleInteraction = () => {
-    if (selectedWeapon) {
-      toast({
-        title: `Anil Khadku hit with ${selectedWeapon.name}!`,
-        description: `Ouch! That must have hurt. +${selectedWeapon.damage} damage.`,
-      });
-      updateSessionStats(prev => ({
-        totalDamageInflicted: prev.totalDamageInflicted + selectedWeapon.damage,
-        weaponUses: {
-          ...prev.weaponUses,
-          [selectedWeapon.id]: (prev.weaponUses[selectedWeapon.id] || 0) + 1,
-        }
-      }));
-    } else {
-      toast({
-        title: "Anil Khadku poked!",
-        description: "He seems mildly annoyed.",
-        variant: "default",
-      });
-      updateSessionStats(prev => ({
-        totalDamageInflicted: prev.totalDamageInflicted + 1, // Poke damage
-      }));
-    }
+    // Simplified interaction: just a generic hit
+    toast({
+      title: "Anil Khadku Whacked!",
+      description: "He felt that one!",
+    });
+    // Removed sessionStats update logic
 
-    setStickmanState(prev => ({ ...prev, isHit: true }));
+    setStickmanState(prev => ({ ...prev, isHit: true, rotation: (prev.rotation + (Math.random() > 0.5 ? 15 : -15)) % 360  })); // Add a slight rotation on hit
     setTimeout(() => setStickmanState(prev => ({ ...prev, isHit: false })), 500); // Duration of shake animation
   };
 
   return (
-    <Card ref={gameAreaRef} className="flex-1 flex items-center justify-center relative overflow-hidden shadow-xl bg-muted/30 border-2 border-dashed border-accent/50">
-      <CardContent className="w-full h-full flex items-center justify-center p-0">
+    <Card ref={gameAreaRef} className="h-full flex items-center justify-center relative overflow-hidden shadow-xl bg-muted/30 border-2 border-dashed border-accent/50">
+      <CardContent className="w-full h-full flex items-center justify-center p-0 relative"> {/* Ensure CardContent is also relative for positioning context */}
         <AnilKhadku
           state={stickmanState}
           onMouseDown={handleMouseDown}
-          onClick={handleInteraction} // Also allow click to interact if not dragging
-          onTouchStart={(e) => { // Basic touch support
-             if (e.touches[0]) {
-                const pseudoMouseEvent = { clientX: e.touches[0].clientX, clientY: e.touches[0].clientY, preventDefault: () => e.preventDefault() } as unknown as React.MouseEvent<SVGSVGElement>;
+          onClick={handleInteraction} 
+          onTouchStart={(e) => { 
+             if (e.touches[0] && gameAreaRef.current) {
+                const rect = gameAreaRef.current.getBoundingClientRect();
+                const pseudoMouseEvent = { 
+                    clientX: e.touches[0].clientX, 
+                    clientY: e.touches[0].clientY, 
+                    preventDefault: () => e.preventDefault() 
+                } as unknown as React.MouseEvent<SVGSVGElement>;
                 handleMouseDown(pseudoMouseEvent);
              }
           }}
+          // Added style to position AnilKhadku absolutely within the CardContent
+          // This allows the x, y from stickmanState to work relative to the center of the GameArea
+          // The transform in AnilKhadku will then apply from this centered position.
+          // However, viewBox in SVG usually handles this, so explicit style might not be needed if SVG is set up for relative internal coords.
+          // For now, relying on the transform in AnilKhadku, and ensuring parent (CardContent) is a positioning context.
         />
       </CardContent>
-      <div className="absolute bottom-4 right-4">
-        <Button onClick={handleInteraction} variant="destructive" size="lg" disabled={!selectedWeapon}>
-          <Target className="mr-2 h-6 w-6" /> Use {selectedWeapon ? selectedWeapon.name : "Weapon"}
-        </Button>
-      </div>
+      {/* Removed the "Use Weapon" button */}
        <div className="absolute top-2 left-1/2 -translate-x-1/2 text-muted-foreground text-sm p-2 bg-background/80 rounded-md">
         Drag or click Anil Khadku!
       </div>
