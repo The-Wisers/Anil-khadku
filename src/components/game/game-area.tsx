@@ -135,8 +135,13 @@ export function GameArea() {
       return;
     }
     
+    // Capture the values from dragStartOffsetRef.current NOW, while it's guaranteed to be non-null
+    const currentDragOffsetX = dragStartOffsetRef.current.offsetX;
+    const currentDragOffsetY = dragStartOffsetRef.current.offsetY;
+
     const clientX = (e as MouseEvent).clientX ?? (e as TouchEvent).touches?.[0]?.clientX ?? 0;
     const clientY = (e as MouseEvent).clientY ?? (e as TouchEvent).touches?.[0]?.clientY ?? 0;
+    
     const gameAreaRect = gameAreaRef.current.getBoundingClientRect();
     
     const mouseXInGameArea = clientX - gameAreaRect.left;
@@ -144,8 +149,8 @@ export function GameArea() {
 
     setStickmanState(prev => ({
       ...prev,
-      x: mouseXInGameArea - dragStartOffsetRef.current!.offsetX,
-      y: mouseYInGameArea - dragStartOffsetRef.current!.offsetY,
+      x: mouseXInGameArea - currentDragOffsetX, // Use captured value
+      y: mouseYInGameArea - currentDragOffsetY, // Use captured value
     }));
     lastMousePositionRef.current = { x: clientX, y: clientY };
   }, [stickmanState.isBeingDragged]);
