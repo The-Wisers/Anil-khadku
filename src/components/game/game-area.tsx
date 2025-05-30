@@ -7,7 +7,7 @@ import { AnilKhadku } from './anil-khadku';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { Rocket, Crosshair, Target, Ban } from 'lucide-react'; // Changed MousePointerSquare to Crosshair
+import { Rocket, Crosshair, Target, Ban } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const GRAVITY = 0.6;
@@ -23,7 +23,7 @@ const TARGET_FRAME_TIME_S = 1 / 60; // Assuming 60 FPS for physics scaling
 
 const initialWeapons: Weapon[] = [
   { id: 'missile', name: 'Missile', icon: Rocket, description: 'Explosive fun!', damage: 50 },
-  { id: 'gun', name: 'Gun', icon: Crosshair, description: 'Precision shot.', damage: 30 }, // Changed icon here
+  { id: 'gun', name: 'Gun', icon: Crosshair, description: 'Precision shot.', damage: 30 },
   { id: 'bow', name: 'Bow', icon: Target, description: 'Archery skills.', damage: 25 },
 ];
 
@@ -41,6 +41,7 @@ export function GameArea() {
   const dragStartOffsetRef = useRef<{ offsetX: number; offsetY: number } | null>(null);
   const lastMousePositionRef = useRef<{ x: number; y: number; timestamp: number } | null>(null);
   const previousMousePositionRef = useRef<{ x: number; y: number; timestamp: number } | null>(null);
+  const stickmanStateRef = useRef(stickmanState);
 
   const animationFrameIdRef = useRef<number | null>(null);
   const { toast } = useToast();
@@ -50,6 +51,10 @@ export function GameArea() {
   const [isAiming, setIsAiming] = useState(false);
   const [aimStartPoint, setAimStartPoint] = useState<{ x: number; y: number } | null>(null);
   const [aimEndPoint, setAimEndPoint] = useState<{ x: number; y: number } | null>(null);
+
+  useEffect(() => {
+    stickmanStateRef.current = stickmanState;
+  }, [stickmanState]);
 
   const gameLoop = useCallback(() => {
     if (!gameAreaRef.current) return;
@@ -117,12 +122,13 @@ export function GameArea() {
     const selectedWeapon = availableWeapons.find(w => w.id === selectedWeaponId);
     if (!selectedWeapon || !gameAreaRef.current) return;
 
-    // Simple collision: check if end point is within stickman bounds
+    const currentStickmanPos = stickmanStateRef.current;
+
     const stickmanRect = {
-      left: stickmanState.x - STICKMAN_WIDTH / 2,
-      right: stickmanState.x + STICKMAN_WIDTH / 2,
-      top: stickmanState.y - STICKMAN_HEIGHT / 2,
-      bottom: stickmanState.y + STICKMAN_HEIGHT / 2,
+      left: currentStickmanPos.x - STICKMAN_WIDTH / 2,
+      right: currentStickmanPos.x + STICKMAN_WIDTH / 2,
+      top: currentStickmanPos.y - STICKMAN_HEIGHT / 2,
+      bottom: currentStickmanPos.y + STICKMAN_HEIGHT / 2,
     };
 
     const hit = end.x >= stickmanRect.left && end.x <= stickmanRect.right &&
@@ -156,15 +162,14 @@ export function GameArea() {
         variant: "destructive"
       });
     }
-  }, [selectedWeaponId, stickmanState.x, stickmanState.y, availableWeapons, toast ]);
+  }, [selectedWeaponId, availableWeapons, toast, stickmanStateRef ]);
 
 
   const handleGameAreaMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (!selectedWeaponId || !gameAreaRef.current) return;
-    // Prevent starting aim if click is on Anil Khadku (handled by AnilKhadku's onMouseDown)
-     // @ts-ignore - checking custom prop
-    if ((e.target as HTMLElement).closest_internal_prop_do_not_use === 'AnilKhadkuSVG' || (e.target as HTMLElement).closest('[data-id="AnilKhadkuSVG"]')) return;
-
+    
+    // Check if the click is on Anil Khadku. If so, let AnilKhadku's own handler manage it.
+    if ((e.target as HTMLElement).closest('[data-id="AnilKhadkuSVG"]')) return;
 
     const gameAreaRect = gameAreaRef.current.getBoundingClientRect();
     const mouseX = e.clientX - gameAreaRect.left;
@@ -174,6 +179,20 @@ export function GameArea() {
     setAimStartPoint({ x: mouseX, y: mouseY });
     setAimEndPoint({ x: mouseX, y: mouseY });
   }, [selectedWeaponId]);
+
+  const handleGameAreaTouchStart = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      const pseudoMouseEvent = {
+          clientX: touch.clientX,
+          clientY: touch.clientY,
+          preventDefault: () => e.preventDefault(),
+          stopPropagation: () => e.stopPropagation(),
+          target: e.target, 
+      } as unknown as React.MouseEvent<HTMLDivElement>;
+      handleGameAreaMouseDown(pseudoMouseEvent);
+    }
+  }, [handleGameAreaMouseDown]);
 
   const handleGlobalMouseMove = useCallback((event: MouseEvent | TouchEvent) => {
     if (!gameAreaRef.current) return;
@@ -203,8 +222,8 @@ export function GameArea() {
             if (!prev.isBeingDragged) return prev;
             return {
                 ...prev,
-                x: mouseX - currentDragOffsetX, // mouseX is already gameArea relative
-                y: mouseY - currentDragOffsetY, // mouseY is already gameArea relative
+                x: mouseX - currentDragOffsetX, 
+                y: mouseY - currentDragOffsetY, 
             };
         });
     }
@@ -291,7 +310,7 @@ export function GameArea() {
           title: `Firing ${selectedWeapon?.name || 'weapon'}!`,
           description: `Direct hit on Anil!`,
       });
-      const anilCenter = { x: stickmanState.x, y: stickmanState.y };
+      const anilCenter = { x: stickmanStateRef.current.x, y: stickmanStateRef.current.y };
       fireWeapon(anilCenter, anilCenter); 
     } else {
       if (!gameAreaRef.current) return;
@@ -302,8 +321,8 @@ export function GameArea() {
       const mouseYInGameArea = clientY - gameAreaRect.top;
 
       dragStartOffsetRef.current = {
-        offsetX: mouseXInGameArea - stickmanState.x,
-        offsetY: mouseYInGameArea - stickmanState.y,
+        offsetX: mouseXInGameArea - stickmanStateRef.current.x,
+        offsetY: mouseYInGameArea - stickmanStateRef.current.y,
       };
       const now = Date.now();
       lastMousePositionRef.current = { x: clientX, y: clientY, timestamp: now };
@@ -311,14 +330,13 @@ export function GameArea() {
 
       setStickmanState(prev => ({
         ...prev,
-        // x and y remain the same until drag actually moves
         isBeingDragged: true,
         isHit: false,
         vx: 0,
         vy: 0,
       }));
     }
-  }, [selectedWeaponId, stickmanState.x, stickmanState.y, fireWeapon, toast, availableWeapons]);
+  }, [selectedWeaponId, fireWeapon, toast, availableWeapons, stickmanStateRef]);
 
   const handleAnilKhadkuClick = useCallback(() => {
     if (selectedWeaponId || stickmanState.isBeingDragged) return; 
@@ -403,7 +421,7 @@ export function GameArea() {
         className="flex-grow flex items-center justify-center relative overflow-hidden shadow-xl bg-muted/30 border-2 border-dashed border-accent/50 touch-none select-none"
         style={{ WebkitUserSelect: 'none', MozUserSelect: 'none', msUserSelect: 'none', userSelect: 'none' }}
         onMouseDown={handleGameAreaMouseDown} 
-        // onTouchStart for game area aiming (TODO if needed, complex with Anil's touch)
+        onTouchStart={handleGameAreaTouchStart}
       >
         <CardContent className="w-full h-full flex items-center justify-center p-0 relative">
           <AnilKhadku
@@ -414,7 +432,7 @@ export function GameArea() {
             onClick={handleAnilKhadkuClick} 
             onTouchStart={handleAnilKhadkuTouchStart} 
             style={{ willChange: 'transform, top, left' }}
-            data-id="AnilKhadkuSVG" // Added for easier event target identification
+            data-id="AnilKhadkuSVG" 
           />
           {isAiming && aimStartPoint && aimEndPoint && (
             <svg className="absolute inset-0 w-full h-full pointer-events-none">
