@@ -1,10 +1,11 @@
+import type { LucideIcon } from 'lucide-react';
+
 export interface Weapon {
   id: string;
   name: string;
-  icon: React.ComponentType<{ className?: string }>;
-  description: string;
-  damage: number; // Example property
-  uses?: number; // Optional: track uses for this specific weapon instance
+  icon: LucideIcon;
+  description: string; // Not used in this version, but good for future
+  damage: number; // Not used in this version, but good for future
 }
 
 export interface SessionStats {
