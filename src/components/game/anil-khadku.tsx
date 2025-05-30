@@ -8,13 +8,11 @@ import { useState, useEffect } from 'react';
 
 interface AnilKhadkuProps extends SVGProps<SVGSVGElement> {
   state: StickmanState;
-  // x and y from state are now center, so we adjust translation
-  // width and height are needed for centering calculation
-  width?: number;
-  height?: number;
+  width?: number; // Actual rendered width in pixels
+  height?: number; // Actual rendered height in pixels
 }
 
-export function AnilKhadku({ state, className, width = 48, height = 72, ...props }: AnilKhadkuProps) {
+export function AnilKhadku({ state, className, width = 96, height = 144, ...props }: AnilKhadkuProps) {
   const [limbRotations, setLimbRotations] = useState({
     leftArm: 0,
     rightArm: 0,
@@ -39,26 +37,27 @@ export function AnilKhadku({ state, className, width = 48, height = 72, ...props
     return () => clearTimeout(timer);
   }, [state.isHit]);
   
-  // Calculate top-left for SVG positioning based on center x, y
   const svgX = state.x - width / 2;
   const svgY = state.y - height / 2;
 
   return (
     <svg
-      viewBox="-50 -10 100 120"
+      viewBox="-50 -10 100 120" // Internal coordinate system
       className={cn(
-        "w-48 h-72 cursor-grab transition-transform duration-0 ease-out", // Removed duration-75 for smoother physics
+        "cursor-grab transition-transform duration-0 ease-out",
         state.isBeingDragged && "cursor-grabbing scale-105",
         state.isHit && "animate-shake",
         className
       )}
       style={{
-        // Position is now absolute within the GameArea based on physics
         position: 'absolute',
         left: `${svgX}px`,
         top: `${svgY}px`,
+        width: `${width}px`, // Explicitly set rendered width
+        height: `${height}px`, // Explicitly set rendered height
         transform: `rotate(${state.rotation}deg)`,
         transformOrigin: 'center center', 
+        willChange: 'transform, top, left', // Optimization hint
       }}
       {...props}
     >
@@ -117,3 +116,4 @@ export function AnilKhadku({ state, className, width = 48, height = 72, ...props
     </svg>
   );
 }
+
