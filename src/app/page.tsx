@@ -13,6 +13,7 @@ export default function LandingPage() {
         <h1 className="text-5xl md:text-7xl font-anton text-primary tracking-tight">
           Anil Khadku's Revenge
         </h1>
+        <meta name="monetag" content="9042db5e5771fae1482997e48976c0aa">
         <p className="text-muted-foreground mt-2 text-lg md:text-xl">
           Get ready to unleash your creativity!
         </p>
