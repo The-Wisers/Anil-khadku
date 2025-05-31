@@ -1,6 +1,3 @@
-# Firebase Studio
-
-This is a NextJS starter in Firebase Studio.
-
-To get started, take a look at src/app/page.tsx.
+# This was a game to stress relief 
+Play Game on: anilkhadku.netlify.app
 # Anil-khadku
