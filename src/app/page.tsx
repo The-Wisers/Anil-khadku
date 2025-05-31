@@ -7,8 +7,7 @@ import { StickmanFigureIcon } from '@/components/icons/custom-icons'; // Using S
 import { Gamepad2 } from 'lucide-react';
 
 export default function LandingPage() {
-  return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-4">
+  return ( <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-4">
       <header className="text-center mb-12">
         <h1 className="text-5xl md:text-7xl font-anton text-primary tracking-tight">
           Anil Khadku's Revenge
